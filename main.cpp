@@ -235,59 +235,6 @@ template <int Mod> struct modint {
         return x;
     }
 };
-template <typename T = int> struct Edge {
-    int from, to;
-    T cost;
-    int idx;
-
-    Edge() = default;
-
-    Edge(int from, int to, T cost = 1, int idx = -1) : from(from), to(to), cost(cost), idx(idx) {
-    }
-
-    operator int() const {
-        return to;
-    }
-};
-
-template <typename T = int> struct Graph {
-    vector<vector<Edge<T>>> g;
-    int es;
-
-    Graph() = default;
-
-    explicit Graph(int n) : g(n), es(0) {
-    }
-
-    size_t size() const {
-        return g.size();
-    }
-
-    void add_directed_edge(int from, int to, T cost = 1) {
-        g[from].emplace_back(from, to, cost, es++);
-    }
-
-    void add_edge(int from, int to, T cost = 1) {
-        g[from].emplace_back(from, to, cost, es);
-        g[to].emplace_back(to, from, cost, es++);
-    }
-
-    void read(int M, int padding = -1, bool weighted = false, bool directed = false) {
-        for (int i = 0; i < M; i++) {
-            int a, b;
-            cin >> a >> b;
-            a += padding;
-            b += padding;
-            T c = T(1);
-            if (weighted)
-                cin >> c;
-            if (directed)
-                add_directed_edge(a, b, c);
-            else
-                add_edge(a, b, c);
-        }
-    }
-};
 
 /* #endregion*/
 // constant
@@ -307,6 +254,59 @@ bool time_check() {
         return false;
     return true;
 }
+
+struct Edge {
+    int to;
+    Edge(int to): to(to) {}
+};
+using Graph = vector<vector<Edge>>;
+using P = pair<long, long>;
+
+/* Lowlink: グラフの関節点・橋を列挙する構造体
+    作成: O(E+V)
+    関節点の集合: vector<int> aps
+    橋の集合: vector<P> bridges
+*/
+struct LowLink {
+    const Graph &G;
+    vector<int> used, ord, low;
+    vector<int> aps;  // articulation points
+    vector<P> bridges;
+
+    LowLink(const Graph &G_) : G(G_) {
+        used.assign(G.size(), 0);
+        ord.assign(G.size(), 0);
+        low.assign(G.size(), 0);
+        int k = 0;
+        for (int i = 0; i < (int)G.size(); i++) {
+            if (!used[i]) k = dfs(i, k, -1);
+        }
+        sort(aps.begin(), aps.end()); // 必要ならソートする
+        sort(bridges.begin(), bridges.end()); // 必要ならソートする
+    }
+
+    int dfs(int id, int k, int par) { // id:探索中の頂点, k:dfsで何番目に探索するか, par:idの親
+        used[id] = true;
+        ord[id] = k++;
+        low[id] = ord[id];
+        bool is_aps = false;
+        int count = 0; // 子の数
+        for (auto &e : G[id]) {
+            if (!used[e.to]) {
+                count++;
+                k = dfs(e.to, k, id);
+                low[id] = min(low[id], low[e.to]);
+                if (par != -1 && ord[id] <= low[e.to]) is_aps = true; 
+                if (ord[id] < low[e.to]) bridges.emplace_back(min(id, e.to), max(id, e.to)); // 条件を満たすので橋  
+            } else if (e.to != par) { // eが後退辺の時
+                low[id] = min(low[id], ord[e.to]);
+            }
+        }
+        if (par == -1 && count >= 2) is_aps = true; 
+        if (is_aps) aps.push_back(id);
+        return k;
+    }
+};
 
 const vector<pair<int, int>> dxy = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
 
@@ -426,9 +426,25 @@ int main(int argc, char *argv[]) {
         });
 
         for(int k: crops){
+            Graph G(H * W);
+            rep(x, H)rep(y, W){
+                if(maze[x][y] == -1){
+                    for(auto [dx, dy] : dxy){
+                        int nx = x + dx;
+                        int ny = y + dy;
+                        if(nx < 0 || nx >= H || ny < 0 || ny >= W || exists_wall(x, y, nx, ny) || maze[nx][ny] != -1) continue;
+                        G[x * W + y].emplace_back(nx * W + ny);
+                    }
+                }
+            }
+            LowLink lowlink(G);
+            set<pair<int, int>> aps;
+            for(int x: lowlink.aps){
+                aps.insert({x / W, x % W});
+            }
             vector<tuple<int, int, int>> dist_xy = calc_dist(maze);
-            dist_xy.resize(min(50, (int)dist_xy.size()));
             for(auto [d, x, y]: dist_xy){
+                if(aps.count({x, y})) continue;
                 maze[x][y] = D[k];
                 if(check_maze(maze)){
                     used[k] = true;
