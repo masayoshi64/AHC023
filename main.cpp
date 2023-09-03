@@ -349,9 +349,11 @@ bool check_maze(mat<int> &maze) {
 
 vector<tuple<int, int, int>> calc_dist(mat<int>& maze){
     mat<int> dist(H, vi(W, inf));
-    dist[i0][0] = 0;
     deque<pair<int, int>> que;
-    que.emplace_back(i0, 0);
+    if(maze[i0][0] == -1){
+        dist[i0][0] = 0;
+        que.emplace_back(i0, 0);
+    }
     while(!que.empty()){
         auto [x, y] = que.front();
         que.pop_front();
