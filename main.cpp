@@ -369,8 +369,12 @@ int main(int argc, char *argv[]) {
     }   
     
     // output
+    double score = 0;
     cout << ans.size() << endl;
     for(auto [k, x, y, s] : ans){
+        score += D[k] - S[k] + 1;
         cout << k + 1 << " " << x << " " << y << " " << s + 1 << endl;
     }
+    score *= (double)1e6 / (H * W * T);
+    cerr << "Score = " << score << endl;
 }
