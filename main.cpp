@@ -308,9 +308,71 @@ bool time_check() {
     return true;
 }
 
+const vector<pair<int, int>> dxy = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+
 int T, H, W, i0, K;
 mat<int> h, v;
 vi S, D;
+
+bool exists_wall(int x, int y, int nx, int ny){
+    if(x == nx){
+        if(y > ny) swap(y, ny);
+        return v[x][y] == 1;
+    }else{
+        if(x > nx) swap(x, nx);
+        return h[x][y] == 1;
+    }
+}
+
+bool check_maze(mat<int> &maze) {
+    mat<bool> used(H, vector<bool>(W, 0));
+    deque<pair<int, int>> que;
+    que.emplace_back(i0, 0);
+    used[i0][0] = true;
+    int cnt = 0;
+    while (!que.empty()) {
+        auto [x, y] = que.front();
+        que.pop_front();
+        cnt++;
+        for(auto [dx, dy] : dxy){
+            int nx = x + dx;
+            int ny = y + dy;
+            if(nx < 0 || nx >= H || ny < 0 || ny >= W || exists_wall(x, y, nx, ny)) continue;
+            if(used[nx][ny]) continue;
+            if(maze[nx][ny] < maze[x][y]) continue;
+            used[nx][ny] = true;
+            que.emplace_back(nx, ny);
+        }
+    }
+    return cnt == H * W;
+}
+
+vector<tuple<int, int, int>> calc_dist(mat<int>& maze){
+    mat<int> dist(H, vi(W, inf));
+    dist[i0][0] = 0;
+    deque<pair<int, int>> que;
+    que.emplace_back(i0, 0);
+    while(!que.empty()){
+        auto [x, y] = que.front();
+        que.pop_front();
+        for(auto [dx, dy] : dxy){
+            int nx = x + dx;
+            int ny = y + dy;
+            if(nx < 0 || nx >= H || ny < 0 || ny >= W || exists_wall(x, y, nx, ny)) continue;
+            if(dist[nx][ny] <= dist[x][y] + 1) continue;
+            if(maze[nx][ny] != -1) continue;
+            dist[nx][ny] = dist[x][y] + 1;
+            que.emplace_back(nx, ny);
+        }
+    }
+    vector<tuple<int, int, int>> res;
+    rep(i, H)rep(j, W){
+        if(dist[i][j] != inf)
+            res.emplace_back(dist[i][j], i, j);
+    }   
+    sort(rall(res));
+    return res;
+}
 
 int main(int argc, char *argv[]) {
     cin.tie(0);
@@ -350,22 +412,35 @@ int main(int argc, char *argv[]) {
     vector<bool> used(K, false);
     mat<int> maze(H, vi(W, -1));
     rep(s, T){
-        if(maze[i0][0] == s - 1) maze[i0][0] = -1;
-        if(maze[i0][0] != -1)continue;
         vi crops;
         rep(j, K){
-            if(S[j] >= s && !used[j]){
+            if(S[j] == s && !used[j]){
                 crops.pb(j);
             }
         }
         if(crops.empty()) continue;
         sort(all(crops), [&](int i, int j){
-            return S[i] < S[j];
+            return D[i] > D[j];
         });
-        int k = crops[0];
-        used[k] = true;
-        maze[i0][0] = D[k];
-        ans.emplace_back(k, i0, 0, s);
+
+        for(int k: crops){
+            vector<tuple<int, int, int>> dist_xy = calc_dist(maze);
+            dist_xy.resize(min(50, (int)dist_xy.size()));
+            for(auto [d, x, y]: dist_xy){
+                maze[x][y] = D[k];
+                if(check_maze(maze)){
+                    used[k] = true;
+                    ans.emplace_back(k, x, y, s);
+                    break;
+                }else{
+                    maze[x][y] = -1;
+                }
+            }
+        }
+
+        rep(i, H)rep(j, W){
+            if(maze[i][j] == s)maze[i][j] = -1;
+        }
     }   
     
     // output

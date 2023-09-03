@@ -1,5 +1,6 @@
 .vscode
 tools
 input.txt
+output.txt
 a.*
 .venv
