@@ -311,7 +311,7 @@ struct LowLink {
 const vector<pair<int, int>> dxy = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
 
 int T, H, W, i0, K;
-mat<int> h, v;
+mat<int> h, v, dist;
 vi S, D;
 
 bool exists_wall(int x, int y, int nx, int ny){
@@ -370,6 +370,42 @@ mat<int> calc_dist(mat<int>& maze){
     return dist;
 }
 
+void hill_climbing(mat<int>& maze, mat<int>& prev_maze, vi& X, vi& Y, vi& plant_times, int s){
+    Timer timer;
+    double max_time = 10;
+    vi plants, plants_prev;
+    rep(k, K){
+        if(plant_times[k] == s){
+            plants.pb(k);
+        }
+        if(plant_times[k] == s - 1){
+            plants_prev.pb(k);
+        }
+    }
+    if(plants.empty() || plants_prev.empty()) return;
+
+    while (timer.lap() < max_time) {
+        int k = plants[xor64(plants.size())];
+        int pk = plants_prev[xor64(plants_prev.size())];
+        int x = X[k], y = Y[k], px = X[pk], py = Y[pk];
+        if((dist[x][y] < dist[px][py]) && (maze[x][y] < maze[px][py]))continue;
+        if((dist[x][y] > dist[px][py]) && (maze[x][y] > maze[px][py]))continue;
+        if(prev_maze[x][y] != -1) continue;
+        swap(maze[x][y], maze[px][py]);
+        swap(prev_maze[x][y], prev_maze[px][py]);
+        prev_maze[px][py] = D[k];
+        if(check_maze(maze) && check_maze(prev_maze)){
+            swap(X[k], X[pk]);
+            swap(Y[k], Y[pk]);
+            plant_times[k] = s - 1;
+        }else{
+            swap(maze[x][y], maze[px][py]);
+            prev_maze[px][py] = -1;
+            swap(prev_maze[x][y], prev_maze[px][py]);
+        }
+    }
+}
+
 int main(int argc, char *argv[]) {
     cin.tie(0);
     ios::sync_with_stdio(0);
@@ -406,8 +442,8 @@ int main(int argc, char *argv[]) {
     // solve
     vi X(K), Y(K), plant_times(K, -1);
     vector<bool> used(K, false);
-    mat<int> maze(H, vi(W, -1));
-    mat<int> dist = calc_dist(maze);
+    mat<int> maze(H, vi(W, -1)), prev_maze(H, vi(W, -1));
+    dist = calc_dist(maze);
     rep(s, T){
         vi crops;
         rep(j, K){
@@ -454,7 +490,8 @@ int main(int argc, char *argv[]) {
                 }
             }
         }
-
+        hill_climbing(maze, prev_maze, X, Y, plant_times, s);
+        prev_maze = maze;
         rep(i, H)rep(j, W){
             if(maze[i][j] == s)maze[i][j] = -1;
         }
