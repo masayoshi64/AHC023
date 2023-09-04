@@ -410,7 +410,7 @@ int main(int argc, char *argv[]) {
     }
 
     // solve
-    vector<tuple<int, int, int, int>> ans;
+    vi X(K), Y(K), plant_times(K, -1);
     vector<bool> used(K, false);
     mat<int> maze(H, vi(W, -1));
     rep(s, T){
@@ -448,7 +448,7 @@ int main(int argc, char *argv[]) {
                 maze[x][y] = D[k];
                 if(check_maze(maze)){
                     used[k] = true;
-                    ans.emplace_back(k, x, y, s);
+                    X[k] = x, Y[k] = y, plant_times[k] = s;
                     break;
                 }else{
                     maze[x][y] = -1;
@@ -463,6 +463,12 @@ int main(int argc, char *argv[]) {
     
     // output
     double score = 0;
+    vector<tuple<int, int, int, int>> ans;
+    rep(k, K){
+        if(plant_times[k] != -1){
+            ans.emplace_back(k, X[k], Y[k], plant_times[k]);
+        }
+    }
     cout << ans.size() << endl;
     for(auto [k, x, y, s] : ans){
         score += D[k] - S[k] + 1;
