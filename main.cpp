@@ -347,7 +347,7 @@ bool check_maze(mat<int> &maze) {
     return cnt == H * W;
 }
 
-vector<tuple<int, int, int>> calc_dist(mat<int>& maze){
+mat<int> calc_dist(mat<int>& maze){
     mat<int> dist(H, vi(W, inf));
     deque<pair<int, int>> que;
     if(maze[i0][0] == -1){
@@ -367,13 +367,7 @@ vector<tuple<int, int, int>> calc_dist(mat<int>& maze){
             que.emplace_back(nx, ny);
         }
     }
-    vector<tuple<int, int, int>> res;
-    rep(i, H)rep(j, W){
-        if(dist[i][j] != inf)
-            res.emplace_back(dist[i][j], i, j);
-    }   
-    sort(rall(res));
-    return res;
+    return dist;
 }
 
 int main(int argc, char *argv[]) {
@@ -413,6 +407,7 @@ int main(int argc, char *argv[]) {
     vi X(K), Y(K), plant_times(K, -1);
     vector<bool> used(K, false);
     mat<int> maze(H, vi(W, -1));
+    mat<int> dist = calc_dist(maze);
     rep(s, T){
         vi crops;
         rep(j, K){
@@ -442,9 +437,13 @@ int main(int argc, char *argv[]) {
             for(int x: lowlink.aps){
                 aps.insert({x / W, x % W});
             }
-            vector<tuple<int, int, int>> dist_xy = calc_dist(maze);
+            vector<tuple<int, int, int>> dist_xy;
+            rep(x, H)rep(y, W){
+                if(maze[x][y] != -1 || aps.count({x, y})) continue;
+                dist_xy.emplace_back(dist[x][y], x, y);
+            }
+            sort(rall(dist_xy));
             for(auto [d, x, y]: dist_xy){
-                if(aps.count({x, y})) continue;
                 maze[x][y] = D[k];
                 if(check_maze(maze)){
                     used[k] = true;
