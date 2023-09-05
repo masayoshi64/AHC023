@@ -474,13 +474,14 @@ int main(int argc, char *argv[]) {
             for(int x: lowlink.aps){
                 aps.insert({x / W, x % W});
             }
-            vector<tuple<int, int, int>> dist_xy;
+            vector<tuple<int, int, int>> score_xy;
             rep(x, H)rep(y, W){
                 if(maze[x][y] != -1 || aps.count({x, y})) continue;
-                dist_xy.emplace_back(dist[x][y], x, y);
+                int score = -dist[x][y];
+                score_xy.emplace_back(score, x, y);
             }
-            sort(rall(dist_xy));
-            for(auto [d, x, y]: dist_xy){
+            sort(all(score_xy));
+            for(auto [d, x, y]: score_xy){
                 maze[x][y] = D[k];
                 if(check_maze(maze)){
                     used[k] = true;
