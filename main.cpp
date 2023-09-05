@@ -474,10 +474,10 @@ int main(int argc, char *argv[]) {
             for(int x: lowlink.aps){
                 aps.insert({x / W, x % W});
             }
-            vector<tuple<int, int, int>> score_xy;
+            vector<tuple<double, int, int>> score_xy;
             rep(x, H)rep(y, W){
                 if(maze[x][y] != -1 || aps.count({x, y})) continue;
-                int score = -dist[x][y];
+                double score = -(double)dist[x][y] + 0.001 * (min(x, H-x) + min(y, W-y));
                 score_xy.emplace_back(score, x, y);
             }
             sort(all(score_xy));
@@ -492,7 +492,7 @@ int main(int argc, char *argv[]) {
                 }
             }
         }
-        hill_climbing(maze, prev_maze, X, Y, plant_times, s);
+        // hill_climbing(maze, prev_maze, X, Y, plant_times, s);
         prev_maze = maze;
         rep(i, H)rep(j, W){
             if(maze[i][j] == s)maze[i][j] = -1;
