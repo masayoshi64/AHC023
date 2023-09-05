@@ -371,6 +371,7 @@ mat<int> calc_dist(mat<int>& maze){
 }
 
 void hill_climbing(mat<int>& maze, mat<int>& prev_maze, vi& X, vi& Y, vi& plant_times, int s){
+    if(s == 0) return;
     Timer timer;
     double max_time = 10;
     vi plants, plants_prev;
@@ -399,9 +400,9 @@ void hill_climbing(mat<int>& maze, mat<int>& prev_maze, vi& X, vi& Y, vi& plant_
             swap(Y[k], Y[pk]);
             plant_times[k] = s - 1;
         }else{
-            swap(maze[x][y], maze[px][py]);
             prev_maze[px][py] = -1;
             swap(prev_maze[x][y], prev_maze[px][py]);
+            swap(maze[x][y], maze[px][py]);
         }
     }
 }
