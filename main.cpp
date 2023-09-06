@@ -452,7 +452,7 @@ int main(int argc, char *argv[]) {
                 crops.pb(j);
             }
         }
-        if(crops.empty()) continue;
+
         sort(all(crops), [&](int i, int j){
             return D[i] > D[j];
         });
