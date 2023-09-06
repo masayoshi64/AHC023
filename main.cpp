@@ -478,7 +478,14 @@ int main(int argc, char *argv[]) {
             vector<tuple<double, int, int>> score_xy;
             rep(x, H)rep(y, W){
                 if(maze[x][y] != -1 || aps.count({x, y})) continue;
-                double score = -(double)dist[x][y] + 0.001 * (min(x, H-x) + min(y, W-y));
+                double score = -0.1 * dist[x][y];
+                for(auto [dx, dy]: dxy){
+                    int nx = x + dx;
+                    int ny = y + dy;
+                    if(nx < 0 || nx >= H || ny < 0 || ny >= W || exists_wall(x, y, nx, ny)) score += 3;
+                    else if(maze[nx][ny] == -1) score += 50;
+                    else score += abs(maze[nx][ny] - D[k]);
+                }
                 score_xy.emplace_back(score, x, y);
             }
             sort(all(score_xy));
