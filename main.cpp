@@ -502,9 +502,12 @@ int main(int argc, char *argv[]) {
     // output
     double score = 0;
     vector<tuple<int, int, int, int>> ans;
+    vi plant_cnt(T), all_cnt(T);
     rep(k, K){
+        all_cnt[S[k]]++;
         if(plant_times[k] != -1){
             ans.emplace_back(k, X[k], Y[k], plant_times[k]);
+            plant_cnt[S[k]]++;
         }
     }
     cout << ans.size() << endl;
@@ -512,6 +515,10 @@ int main(int argc, char *argv[]) {
         score += D[k] - S[k] + 1;
         cout << k + 1 << " " << x << " " << y << " " << s + 1 << endl;
     }
+    rep(i, T){
+        cerr << "day " << i << ": " << plant_cnt[i] << " / " << all_cnt[i] << endl;
+    }
+    cerr << "all: " << accumulate(all(plant_cnt), 0) << " / " << accumulate(all(all_cnt), 0) << endl;
     score *= (double)1e6 / (H * W * T);
     cerr << "Score = " << score << endl;
 }
