@@ -477,7 +477,7 @@ int main(int argc, char *argv[]) {
             }
             vector<tuple<double, int, int>> score_xy;
             rep(x, H)rep(y, W){
-                if(maze[x][y] != -1 || aps.count({x, y})) continue;
+                if(maze[x][y] != -1 || aps.count({x, y}) || (x == i0 && y == 0)) continue;
                 double score = -0.1 * dist[x][y];
                 for(auto [dx, dy]: dxy){
                     int nx = x + dx;
@@ -491,7 +491,7 @@ int main(int argc, char *argv[]) {
             sort(all(score_xy));
             for(auto [d, x, y]: score_xy){
                 maze[x][y] = D[k];
-                if(check_maze(maze)){
+                if(s == 0 || check_maze(maze)){
                     used[k] = true;
                     X[k] = x, Y[k] = y, plant_times[k] = s;
                     break;
