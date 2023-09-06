@@ -451,6 +451,7 @@ int main(int argc, char *argv[]) {
             if(S[j] == s && !used[j]){
                 crops.pb(j);
             }
+            if(s == 0 && 1 <= S[j] && S[j] <= 5 && !used[j]) crops.pb(j);
         }
 
         sort(all(crops), [&](int i, int j){
