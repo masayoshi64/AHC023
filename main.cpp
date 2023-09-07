@@ -313,10 +313,10 @@ const vector<pair<int, int>> dxy2 = {{1, 1}, {-1, -1}, {-1, 1}, {1, -1}};
 
 int T, H, W, i0, K;
 mat<int> h, v, dist;
-vi S, D;
+vi S, D, X, Y, plant_times;
 double coef_dist = 0.1, empty_penalty = 50, equal_bonus = 5, wall_penalty = 3;
 
-bool exists_wall(int x, int y, int nx, int ny){
+bool _exists_wall(int x, int y, int nx, int ny){
     if(x == nx){
         if(y > ny) swap(y, ny);
         return v[x][y] == 1;
@@ -326,9 +326,9 @@ bool exists_wall(int x, int y, int nx, int ny){
     }
 }
 
-bool exists_wall8(int x, int y, int nx, int ny){
-    if(x == nx || y == ny) return exists_wall(x, y, nx, ny);
-    return (exists_wall(x, y, nx, y) || exists_wall(nx, y, nx, ny)) && (exists_wall(x, y, x, ny) || exists_wall(x, ny, nx, ny));
+bool exists_wall(int x, int y, int nx, int ny){
+    if(x == nx || y == ny) return _exists_wall(x, y, nx, ny);
+    return (_exists_wall(x, y, nx, y) || _exists_wall(nx, y, nx, ny)) && (_exists_wall(x, y, x, ny) || _exists_wall(x, ny, nx, ny));
 }
 
 bool check_maze(mat<int> &maze) {
@@ -377,7 +377,6 @@ mat<int> calc_dist(mat<int>& maze){
     return dist;
 }
 
-
 double calc_score(int x, int y, int d, mat<int>& maze){
     double score = -coef_dist * dist[x][y];
     for(auto [dx, dy]: dxy){
@@ -394,13 +393,16 @@ double calc_score(int x, int y, int d, mat<int>& maze){
     for(auto [dx, dy]: dxy2){
         int nx = x + dx;
         int ny = y + dy;
-        if(nx < 0 || nx >= H || ny < 0 || ny >= W || exists_wall8(x, y, nx, ny)) continue;
+        if(nx < 0 || nx >= H || ny < 0 || ny >= W || exists_wall(x, y, nx, ny)) continue;
         if(maze[nx][ny] == d) score -= equal_bonus;
     }
     return score;
 }
 
-mat<int> greedy(int s, vi& crops, mat<int>& maze, vector<bool>& used, vi& X, vi& Y, vi& plant_times){
+mat<int> greedy(int s, vi& crops, mat<int>& maze){
+    sort(all(crops), [&](int i, int j){
+        return D[i] > D[j];
+    });
     mat<int> maze_k(H, vi(W, -1));
     for(int k: crops){
         Graph G(H * W);
@@ -429,7 +431,6 @@ mat<int> greedy(int s, vi& crops, mat<int>& maze, vector<bool>& used, vi& X, vi&
         for(auto [d, x, y]: score_xy){
             maze[x][y] = D[k];
             if(s == 0 || check_maze(maze)){
-                used[k] = true;
                 X[k] = x, Y[k] = y, plant_times[k] = s;
                 maze_k[x][y] = k;
                 break;
@@ -524,10 +525,11 @@ int main(int argc, char *argv[]) {
     }
 
     // solve
-    vi X(K), Y(K), plant_times(K, -1);
-    vector<bool> used(K, false);
+    X.resize(K), Y.resize(K), plant_times.resize(K, -1);
     mat<int> maze(H, vi(W, -1));
     dist = calc_dist(maze);
+    
+    // 初期配置
     vi init_crops;
     rep(s, T){
         rep(j, K){
@@ -537,10 +539,7 @@ int main(int argc, char *argv[]) {
             }
         }
     }
-    sort(all(init_crops), [&](int i, int j){
-        return D[i] > D[j];
-    });
-    mat<int> maze_k = greedy(0, init_crops, maze, used, X, Y, plant_times);
+    mat<int> maze_k = greedy(0, init_crops, maze);
     State state(maze, maze_k);
     state = hill_climbing(state);
     maze = state.maze;
@@ -550,20 +549,17 @@ int main(int argc, char *argv[]) {
         if(k == -1) continue;
         X[k] = x, Y[k] = y;
     }
-    rep(s, T){
+
+    // その他の日
+    rep(s, 1, T){
         vi crops;
         rep(j, K){
-            if(S[j] == s && !used[j]){
+            if(S[j] == s && plant_times[j] == -1){
                 crops.pb(j);
             }
-            if(s == 0 && 1 <= S[j] && S[j] <= 5 && !used[j]) crops.pb(j);
         }
 
-        sort(all(crops), [&](int i, int j){
-            return D[i] > D[j];
-        });
-
-        greedy(s, crops, maze, used, X, Y, plant_times);
+        greedy(s, crops, maze);
         
         rep(i, H)rep(j, W){
             if(maze[i][j] == s)maze[i][j] = -1;
@@ -586,6 +582,8 @@ int main(int argc, char *argv[]) {
         score += D[k] - S[k] + 1;
         cout << k + 1 << " " << x << " " << y << " " << s + 1 << endl;
     }
+
+    // check
     rep(i, T){
         cerr << "day " << i << ": " << plant_cnt[i] << " / " << all_cnt[i] << endl;
     }
