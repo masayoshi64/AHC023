@@ -370,7 +370,8 @@ mat<int> calc_dist(mat<int>& maze){
     return dist;
 }
 
-void greedy(int s, vi& crops, mat<int>& maze, vector<bool>& used, vi& X, vi& Y, vi& plant_times){
+mat<int> greedy(int s, vi& crops, mat<int>& maze, vector<bool>& used, vi& X, vi& Y, vi& plant_times){
+    mat<int> maze_k(H, vi(W, -1));
     for(int k: crops){
         Graph G(H * W);
         rep(x, H)rep(y, W){
@@ -411,12 +412,69 @@ void greedy(int s, vi& crops, mat<int>& maze, vector<bool>& used, vi& X, vi& Y, 
             if(s == 0 || check_maze(maze)){
                 used[k] = true;
                 X[k] = x, Y[k] = y, plant_times[k] = s;
+                maze_k[x][y] = k;
                 break;
             }else{
                 maze[x][y] = -1;
             }
         }
     }
+    return maze_k;
+}
+
+struct State{
+    mat<int> maze, maze_k;
+    int x1, y1, x2, y2;
+    State(mat<int> maze, mat<int> maze_k): maze(maze), maze_k(maze_k){}
+    double get_new_score(){
+        while(true){
+            x1 = xor64(H), y1 = xor64(W);
+            auto [dx, dy] = dxy[xor64(4)];
+            x2 = x1 + dx, y2 = y1 + dy;
+            if(x2 < 0 || x2 >= H || y2 < 0 || y2 >= W || exists_wall(x1, y1, x2, y2) || maze[x1][y1] == maze[x2][y2]) continue;
+            swap(maze[x1][y1], maze[x2][y2]);
+            if(!check_maze(maze)){
+                swap(maze[x1][y1], maze[x2][y2]);
+                continue;
+            }
+            swap(maze[x1][y1], maze[x2][y2]);
+            break;
+        }
+        double diff = 0;
+        for(auto [x, y]: {mp(x1, y1), mp(x2, y2)}){
+            for(auto [dx, dy]: dxy){
+                int nx = x + dx, ny = y + dy;
+                if(nx < 0 || nx >= H || ny < 0 || ny >= W || exists_wall(x, y, nx, ny)) continue;
+                diff += abs(maze[x][y] - maze[nx][ny]);
+            }
+        }
+        swap(maze[x1][y1], maze[x2][y2]);
+        for(auto [x, y]: {mp(x1, y1), mp(x2, y2)}){
+            for(auto [dx, dy]: dxy){
+                int nx = x + dx, ny = y + dy;
+                if(nx < 0 || nx >= H || ny < 0 || ny >= W || exists_wall(x, y, nx, ny)) continue;
+                diff -= abs(maze[x][y] - maze[nx][ny]);
+            }
+        }
+        swap(maze[x1][y1], maze[x2][y2]);
+        return diff;
+    }  
+    void step(){
+        swap(maze_k[x1][y1], maze_k[x2][y2]);
+        swap(maze[x1][y1], maze[x2][y2]);
+    } // 実際の更新
+};
+
+State hill_climbing(State state){
+    Timer timer;
+    double max_time = 800;
+    while (timer.lap() < max_time) {
+        double diff = state.get_new_score();
+        if (diff >= 0) {
+            state.step();
+        }
+    }
+    return state;
 }
 
 int main(int argc, char *argv[]) {
@@ -469,8 +527,16 @@ int main(int argc, char *argv[]) {
     sort(all(init_crops), [&](int i, int j){
         return D[i] > D[j];
     });
-    greedy(0, init_crops, maze, used, X, Y, plant_times);
-    
+    mat<int> maze_k = greedy(0, init_crops, maze, used, X, Y, plant_times);
+    State state(maze, maze_k);
+    state = hill_climbing(state);
+    maze = state.maze;
+    maze_k = state.maze_k;
+    rep(x, H)rep(y, W){
+        int k = maze_k[x][y];
+        if(k == -1) continue;
+        X[k] = x, Y[k] = y;
+    }
     rep(s, T){
         vi crops;
         rep(j, K){
