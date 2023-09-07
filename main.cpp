@@ -314,6 +314,7 @@ const vector<pair<int, int>> dxy2 = {{1, 1}, {-1, -1}, {-1, 1}, {1, -1}};
 int T, H, W, i0, K;
 mat<int> h, v, dist;
 vi S, D;
+double coef_dist = 0.1, empty_penalty = 50, equal_bonus = 5, wall_penalty = 3;
 
 bool exists_wall(int x, int y, int nx, int ny){
     if(x == nx){
@@ -378,23 +379,23 @@ mat<int> calc_dist(mat<int>& maze){
 
 
 double calc_score(int x, int y, int d, mat<int>& maze){
-    double score = -0.1 * dist[x][y];
+    double score = -coef_dist * dist[x][y];
     for(auto [dx, dy]: dxy){
         int nx = x + dx;
         int ny = y + dy;
         if(nx < 0 || nx >= H || ny < 0 || ny >= W || exists_wall(x, y, nx, ny)){
-            score += 3;
+            score += wall_penalty;
             continue;
         }
-        if(maze[nx][ny] == -1) score += 50;
+        if(maze[nx][ny] == -1) score += empty_penalty;
         else score += abs(maze[nx][ny] - d);
-        if(maze[nx][ny] == d) score -= 5;
+        if(maze[nx][ny] == d) score -= equal_bonus;
     }
     for(auto [dx, dy]: dxy2){
         int nx = x + dx;
         int ny = y + dy;
         if(nx < 0 || nx >= H || ny < 0 || ny >= W || exists_wall8(x, y, nx, ny)) continue;
-        if(maze[nx][ny] == d) score -= 5;
+        if(maze[nx][ny] == d) score -= equal_bonus;
     }
     return score;
 }
@@ -473,7 +474,7 @@ struct State{
 
 State hill_climbing(State state){
     Timer timer;
-    double max_time = 800;
+    double max_time = 0;
     while (timer.lap() < max_time) {
         double diff = state.get_new_score();
         if (diff > 0) {
@@ -490,6 +491,12 @@ int main(int argc, char *argv[]) {
     cerr << setprecision(30) << fixed;
 
     // input
+    if (argc == 5){
+        coef_dist = atof(argv[1]);
+        empty_penalty = atof(argv[2]);
+        equal_bonus = atof(argv[3]);
+        wall_penalty = atof(argv[4]);
+    }
     cin >> T >> H >> W >> i0;
     h.resize(H - 1, vi(W));
     v.resize(H, vi(W - 1));
