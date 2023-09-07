@@ -309,7 +309,7 @@ struct LowLink {
 };
 
 const vector<pair<int, int>> dxy = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
-const vector<pair<int, int>> dxy8 = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {1, 1}, {-1, -1}, {-1, 1}, {1, -1}};
+const vector<pair<int, int>> dxy2 = {{1, 1}, {-1, -1}, {-1, 1}, {1, -1}};
 
 int T, H, W, i0, K;
 mat<int> h, v, dist;
@@ -408,6 +408,12 @@ mat<int> greedy(int s, vi& crops, mat<int>& maze, vector<bool>& used, vi& X, vi&
                 }
                 if(maze[nx][ny] == -1) score += 50;
                 else score += abs(maze[nx][ny] - D[k]);
+                if(maze[nx][ny] == D[k]) score -= 5;
+            }
+            for(auto [dx, dy]: dxy2){
+                int nx = x + dx;
+                int ny = y + dy;
+                if(nx < 0 || nx >= H || ny < 0 || ny >= W || exists_wall8(x, y, nx, ny)) continue;
                 if(maze[nx][ny] == D[k]) score -= 5;
             }
             score_xy.emplace_back(score, x, y);
@@ -535,7 +541,7 @@ int main(int argc, char *argv[]) {
     });
     mat<int> maze_k = greedy(0, init_crops, maze, used, X, Y, plant_times);
     State state(maze, maze_k);
-    state = hill_climbing(state);
+    // state = hill_climbing(state);
     maze = state.maze;
     maze_k = state.maze_k;
     rep(x, H)rep(y, W){
