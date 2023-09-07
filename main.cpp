@@ -453,6 +453,20 @@ int main(int argc, char *argv[]) {
     vector<bool> used(K, false);
     mat<int> maze(H, vi(W, -1));
     dist = calc_dist(maze);
+    vi init_crops;
+    rep(s, T){
+        rep(j, K){
+            if(init_crops.size() == W * H - 1) break;
+            if(S[j] == s){
+                init_crops.pb(j);
+            }
+        }
+    }
+    sort(all(init_crops), [&](int i, int j){
+        return D[i] > D[j];
+    });
+    greedy(0, init_crops, maze, used, X, Y, plant_times);
+    
     rep(s, T){
         vi crops;
         rep(j, K){
