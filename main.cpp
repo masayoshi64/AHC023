@@ -395,9 +395,13 @@ void greedy(int s, vi& crops, mat<int>& maze, vector<bool>& used, vi& X, vi& Y, 
             for(auto [dx, dy]: dxy){
                 int nx = x + dx;
                 int ny = y + dy;
-                if(nx < 0 || nx >= H || ny < 0 || ny >= W || exists_wall(x, y, nx, ny)) score += 3;
-                else if(maze[nx][ny] == -1) score += 50;
+                if(nx < 0 || nx >= H || ny < 0 || ny >= W || exists_wall(x, y, nx, ny)){
+                    score += 3;
+                    continue;
+                }
+                if(maze[nx][ny] == -1) score += 50;
                 else score += abs(maze[nx][ny] - D[k]);
+                if(maze[nx][ny] == D[k]) score -= 5;
             }
             score_xy.emplace_back(score, x, y);
         }
