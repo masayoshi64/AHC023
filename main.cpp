@@ -311,7 +311,7 @@ struct LowLink {
 const vector<pair<int, int>> dxy = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
 const vector<pair<int, int>> dxy2 = {{1, 1}, {-1, -1}, {-1, 1}, {1, -1}};
 
-int T, H, W, i0, K;
+int T, H, W, i0, K, wall_cnt = 0;
 mat<int> h, v, dist;
 vi S, D, X, Y, plant_times;
 double coef_dist = 0.1, empty_penalty = 50, equal_bonus = 5, wall_penalty = 3;
@@ -506,6 +506,7 @@ int main(int argc, char *argv[]) {
             char x;
             cin >> x;
             h[i][j] = x - '0';
+            if(h[i][j] == 1) wall_cnt++; 
         }
     }
     rep(i, H){
@@ -513,6 +514,7 @@ int main(int argc, char *argv[]) {
             char x;
             cin >> x;
             v[i][j] = x - '0';
+            if(v[i][j] == 1) wall_cnt++;
         }
     }
     cin >> K;
@@ -590,4 +592,5 @@ int main(int argc, char *argv[]) {
     cerr << "all: " << accumulate(all(plant_cnt), 0) << " / " << accumulate(all(all_cnt), 0) << endl;
     score *= (double)1e6 / (H * W * T);
     cerr << "Score = " << score << endl;
+    cerr << "[DATA] wall_cnt = " << wall_cnt << endl;
 }
