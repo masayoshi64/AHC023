@@ -376,6 +376,29 @@ mat<int> calc_dist(mat<int>& maze){
     return dist;
 }
 
+
+double calc_score(int x, int y, int d, mat<int>& maze){
+    double score = -0.1 * dist[x][y];
+    for(auto [dx, dy]: dxy){
+        int nx = x + dx;
+        int ny = y + dy;
+        if(nx < 0 || nx >= H || ny < 0 || ny >= W || exists_wall(x, y, nx, ny)){
+            score += 3;
+            continue;
+        }
+        if(maze[nx][ny] == -1) score += 50;
+        else score += abs(maze[nx][ny] - d);
+        if(maze[nx][ny] == d) score -= 5;
+    }
+    for(auto [dx, dy]: dxy2){
+        int nx = x + dx;
+        int ny = y + dy;
+        if(nx < 0 || nx >= H || ny < 0 || ny >= W || exists_wall8(x, y, nx, ny)) continue;
+        if(maze[nx][ny] == d) score -= 5;
+    }
+    return score;
+}
+
 mat<int> greedy(int s, vi& crops, mat<int>& maze, vector<bool>& used, vi& X, vi& Y, vi& plant_times){
     mat<int> maze_k(H, vi(W, -1));
     for(int k: crops){
@@ -398,24 +421,7 @@ mat<int> greedy(int s, vi& crops, mat<int>& maze, vector<bool>& used, vi& X, vi&
         vector<tuple<double, int, int>> score_xy;
         rep(x, H)rep(y, W){
             if(maze[x][y] != -1 || aps.count({x, y}) || (x == i0 && y == 0)) continue;
-            double score = -0.1 * dist[x][y];
-            for(auto [dx, dy]: dxy){
-                int nx = x + dx;
-                int ny = y + dy;
-                if(nx < 0 || nx >= H || ny < 0 || ny >= W || exists_wall(x, y, nx, ny)){
-                    score += 3;
-                    continue;
-                }
-                if(maze[nx][ny] == -1) score += 50;
-                else score += abs(maze[nx][ny] - D[k]);
-                if(maze[nx][ny] == D[k]) score -= 5;
-            }
-            for(auto [dx, dy]: dxy2){
-                int nx = x + dx;
-                int ny = y + dy;
-                if(nx < 0 || nx >= H || ny < 0 || ny >= W || exists_wall8(x, y, nx, ny)) continue;
-                if(maze[nx][ny] == D[k]) score -= 5;
-            }
+            double score = calc_score(x, y, D[k], maze);
             score_xy.emplace_back(score, x, y);
         }
         sort(all(score_xy));
@@ -453,21 +459,9 @@ struct State{
             break;
         }
         double diff = 0;
-        for(auto [x, y]: {mp(x1, y1), mp(x2, y2)}){
-            for(auto [dx, dy]: dxy){
-                int nx = x + dx, ny = y + dy;
-                if(nx < 0 || nx >= H || ny < 0 || ny >= W || exists_wall(x, y, nx, ny)) continue;
-                diff += abs(maze[x][y] - maze[nx][ny]);
-            }
-        }
+        diff += calc_score(x1, y1, maze[x1][y1], maze) + calc_score(x2, y2, maze[x2][y2], maze);
         swap(maze[x1][y1], maze[x2][y2]);
-        for(auto [x, y]: {mp(x1, y1), mp(x2, y2)}){
-            for(auto [dx, dy]: dxy){
-                int nx = x + dx, ny = y + dy;
-                if(nx < 0 || nx >= H || ny < 0 || ny >= W || exists_wall(x, y, nx, ny)) continue;
-                diff -= abs(maze[x][y] - maze[nx][ny]);
-            }
-        }
+        diff -= calc_score(x1, y1, maze[x1][y1], maze) + calc_score(x2, y2, maze[x2][y2], maze);
         swap(maze[x1][y1], maze[x2][y2]);
         return diff;
     }  
@@ -482,7 +476,7 @@ State hill_climbing(State state){
     double max_time = 800;
     while (timer.lap() < max_time) {
         double diff = state.get_new_score();
-        if (diff >= 0) {
+        if (diff > 0) {
             state.step();
         }
     }
@@ -541,7 +535,7 @@ int main(int argc, char *argv[]) {
     });
     mat<int> maze_k = greedy(0, init_crops, maze, used, X, Y, plant_times);
     State state(maze, maze_k);
-    // state = hill_climbing(state);
+    state = hill_climbing(state);
     maze = state.maze;
     maze_k = state.maze_k;
     rep(x, H)rep(y, W){
