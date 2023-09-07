@@ -309,6 +309,7 @@ struct LowLink {
 };
 
 const vector<pair<int, int>> dxy = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+const vector<pair<int, int>> dxy8 = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {1, 1}, {-1, -1}, {-1, 1}, {1, -1}};
 
 int T, H, W, i0, K;
 mat<int> h, v, dist;
@@ -322,6 +323,11 @@ bool exists_wall(int x, int y, int nx, int ny){
         if(x > nx) swap(x, nx);
         return h[x][y] == 1;
     }
+}
+
+bool exists_wall8(int x, int y, int nx, int ny){
+    if(x == nx || y == ny) return exists_wall(x, y, nx, ny);
+    return (exists_wall(x, y, nx, y) || exists_wall(nx, y, nx, ny)) && (exists_wall(x, y, x, ny) || exists_wall(x, ny, nx, ny));
 }
 
 bool check_maze(mat<int> &maze) {
