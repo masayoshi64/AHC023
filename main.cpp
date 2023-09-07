@@ -370,39 +370,47 @@ mat<int> calc_dist(mat<int>& maze){
     return dist;
 }
 
-void hill_climbing(mat<int>& maze, mat<int>& prev_maze, vi& X, vi& Y, vi& plant_times, int s){
-    if(s == 0) return;
-    Timer timer;
-    double max_time = 10;
-    vi plants, plants_prev;
-    rep(k, K){
-        if(plant_times[k] == s){
-            plants.pb(k);
+void greedy(int s, vi& crops, mat<int>& maze, vector<bool>& used, vi& X, vi& Y, vi& plant_times){
+    for(int k: crops){
+        Graph G(H * W);
+        rep(x, H)rep(y, W){
+            if(maze[x][y] == -1){
+                for(auto [dx, dy] : dxy){
+                    int nx = x + dx;
+                    int ny = y + dy;
+                    if(nx < 0 || nx >= H || ny < 0 || ny >= W || exists_wall(x, y, nx, ny) || maze[nx][ny] != -1) continue;
+                    G[x * W + y].emplace_back(nx * W + ny);
+                }
+            }
         }
-        if(plant_times[k] == s - 1){
-            plants_prev.pb(k);
+        LowLink lowlink(G);
+        set<pair<int, int>> aps;
+        for(int x: lowlink.aps){
+            aps.insert({x / W, x % W});
         }
-    }
-    if(plants.empty() || plants_prev.empty()) return;
-
-    while (timer.lap() < max_time) {
-        int k = plants[xor64(plants.size())];
-        int pk = plants_prev[xor64(plants_prev.size())];
-        int x = X[k], y = Y[k], px = X[pk], py = Y[pk];
-        if((dist[x][y] < dist[px][py]) && (maze[x][y] < maze[px][py]))continue;
-        if((dist[x][y] > dist[px][py]) && (maze[x][y] > maze[px][py]))continue;
-        if(prev_maze[x][y] != -1) continue;
-        swap(maze[x][y], maze[px][py]);
-        swap(prev_maze[x][y], prev_maze[px][py]);
-        prev_maze[px][py] = D[k];
-        if(check_maze(maze) && check_maze(prev_maze)){
-            swap(X[k], X[pk]);
-            swap(Y[k], Y[pk]);
-            plant_times[k] = s - 1;
-        }else{
-            prev_maze[px][py] = -1;
-            swap(prev_maze[x][y], prev_maze[px][py]);
-            swap(maze[x][y], maze[px][py]);
+        vector<tuple<double, int, int>> score_xy;
+        rep(x, H)rep(y, W){
+            if(maze[x][y] != -1 || aps.count({x, y}) || (x == i0 && y == 0)) continue;
+            double score = -0.1 * dist[x][y];
+            for(auto [dx, dy]: dxy){
+                int nx = x + dx;
+                int ny = y + dy;
+                if(nx < 0 || nx >= H || ny < 0 || ny >= W || exists_wall(x, y, nx, ny)) score += 3;
+                else if(maze[nx][ny] == -1) score += 50;
+                else score += abs(maze[nx][ny] - D[k]);
+            }
+            score_xy.emplace_back(score, x, y);
+        }
+        sort(all(score_xy));
+        for(auto [d, x, y]: score_xy){
+            maze[x][y] = D[k];
+            if(s == 0 || check_maze(maze)){
+                used[k] = true;
+                X[k] = x, Y[k] = y, plant_times[k] = s;
+                break;
+            }else{
+                maze[x][y] = -1;
+            }
         }
     }
 }
@@ -443,7 +451,7 @@ int main(int argc, char *argv[]) {
     // solve
     vi X(K), Y(K), plant_times(K, -1);
     vector<bool> used(K, false);
-    mat<int> maze(H, vi(W, -1)), prev_maze(H, vi(W, -1));
+    mat<int> maze(H, vi(W, -1));
     dist = calc_dist(maze);
     rep(s, T){
         vi crops;
@@ -458,50 +466,8 @@ int main(int argc, char *argv[]) {
             return D[i] > D[j];
         });
 
-        for(int k: crops){
-            Graph G(H * W);
-            rep(x, H)rep(y, W){
-                if(maze[x][y] == -1){
-                    for(auto [dx, dy] : dxy){
-                        int nx = x + dx;
-                        int ny = y + dy;
-                        if(nx < 0 || nx >= H || ny < 0 || ny >= W || exists_wall(x, y, nx, ny) || maze[nx][ny] != -1) continue;
-                        G[x * W + y].emplace_back(nx * W + ny);
-                    }
-                }
-            }
-            LowLink lowlink(G);
-            set<pair<int, int>> aps;
-            for(int x: lowlink.aps){
-                aps.insert({x / W, x % W});
-            }
-            vector<tuple<double, int, int>> score_xy;
-            rep(x, H)rep(y, W){
-                if(maze[x][y] != -1 || aps.count({x, y}) || (x == i0 && y == 0)) continue;
-                double score = -0.1 * dist[x][y];
-                for(auto [dx, dy]: dxy){
-                    int nx = x + dx;
-                    int ny = y + dy;
-                    if(nx < 0 || nx >= H || ny < 0 || ny >= W || exists_wall(x, y, nx, ny)) score += 3;
-                    else if(maze[nx][ny] == -1) score += 50;
-                    else score += abs(maze[nx][ny] - D[k]);
-                }
-                score_xy.emplace_back(score, x, y);
-            }
-            sort(all(score_xy));
-            for(auto [d, x, y]: score_xy){
-                maze[x][y] = D[k];
-                if(s == 0 || check_maze(maze)){
-                    used[k] = true;
-                    X[k] = x, Y[k] = y, plant_times[k] = s;
-                    break;
-                }else{
-                    maze[x][y] = -1;
-                }
-            }
-        }
-        // hill_climbing(maze, prev_maze, X, Y, plant_times, s);
-        prev_maze = maze;
+        greedy(s, crops, maze, used, X, Y, plant_times);
+        
         rep(i, H)rep(j, W){
             if(maze[i][j] == s)maze[i][j] = -1;
         }
