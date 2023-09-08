@@ -311,9 +311,9 @@ struct LowLink {
 const vector<pair<int, int>> dxy = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
 const vector<pair<int, int>> dxy2 = {{1, 1}, {-1, -1}, {-1, 1}, {1, -1}};
 
-int T, H, W, i0, K, wall_cnt = 0;
+int T, H, W, i0, K;
 mat<int> h, v, dist;
-vi S, D, X, Y, plant_times;
+vi S, D;
 double coef_dist = 0.1, empty_penalty = 50, equal_bonus = 5, wall_penalty = 3;
 
 bool _exists_wall(int x, int y, int nx, int ny){
@@ -355,7 +355,7 @@ vector<pair<int, int>> get_valid_places(mat<int>& maze, int d, bool init = false
     if(!init){
         mat<pair<int, int>> d_to_places(T);
         rep(x, H)rep(y, W){
-            if(maze[x][y] != -1) d_to_places[maze[x][y]].emplace_back(x, y);
+            if(maze[x][y] != -1) d_to_places[D[maze[x][y]]].emplace_back(x, y);
         }
         mat<int> connected(H, vi(W, 0));
         rep(s, d){
@@ -371,16 +371,16 @@ vector<pair<int, int>> get_valid_places(mat<int>& maze, int d, bool init = false
                         int nx = x + dx;
                         int ny = y + dy;
                         if(nx < 0 || nx >= H || ny < 0 || ny >= W || exists_wall(x, y, nx, ny)) continue;
-                        if(maze[nx][ny] == maze[x][y]){
+                        if(maze[nx][ny] == -1){
+                            G[x * W + y].emplace_back(nx * W + ny);
+                            G[nx * W + ny].emplace_back(x * W + y);
+                        }else if(D[maze[nx][ny]] == D[maze[x][y]]){
                             if(connected[nx][ny] == 1) continue;
                             G[x * W + y].emplace_back(nx * W + ny);
                             G[nx * W + ny].emplace_back(x * W + y);
                             connected[nx][ny] = 1;
                             que.emplace_back(nx, ny);
-                        }else if(maze[nx][ny] == -1){
-                            G[x * W + y].emplace_back(nx * W + ny);
-                            G[nx * W + ny].emplace_back(x * W + y);
-                        }else if(d > maze[nx][ny] && maze[nx][ny] > maze[x][y]){
+                        }else if(d > D[maze[nx][ny]] && D[maze[nx][ny]] > D[maze[x][y]]){
                             if(connected[nx][ny] == 1) continue;
                             connected[nx][ny] = 1;
                             que.emplace_back(nx, ny);
@@ -437,22 +437,21 @@ double calc_score(int x, int y, int d, mat<int>& maze){
             continue;
         }
         if(maze[nx][ny] == -1) score += empty_penalty;
-        else score += abs(maze[nx][ny] - d);
-        if(maze[nx][ny] == d) score -= equal_bonus;
+        else{
+            score += abs(D[maze[nx][ny]] - d);
+            if(D[maze[nx][ny]] == d) score -= equal_bonus;
+        }
     }
     for(auto [dx, dy]: dxy2){
         int nx = x + dx;
         int ny = y + dy;
         if(nx < 0 || nx >= H || ny < 0 || ny >= W || exists_wall(x, y, nx, ny)) continue;
-        if(maze[nx][ny] == d) score -= equal_bonus;
+        if(maze[nx][ny] != -1 && D[maze[nx][ny]] == d) score -= equal_bonus;
     }
     return score;
 }
 
-void greedy(int s, vi& crops, vi& priority, mat<int>& maze){
-    sort(all(crops), [&](int i, int j){
-        return priority[i] > priority[j];
-    });
+mat<int> greedy(int s, vi& crops, mat<int> maze){
     for(int k: crops){
         vector<tuple<double, int, int>> score_xy;
         for(auto [x, y]: get_valid_places(maze, D[k], s == 0)){
@@ -461,9 +460,9 @@ void greedy(int s, vi& crops, vi& priority, mat<int>& maze){
         }
         if(score_xy.empty()) continue;
         auto [score, x, y] = *min_element(all(score_xy));
-        maze[x][y] = D[k];
-        X[k] = x, Y[k] = y, plant_times[k] = s;
+        maze[x][y] = k;
     }
+    return maze;
 }
 
 int main(int argc, char *argv[]) {
@@ -482,6 +481,7 @@ int main(int argc, char *argv[]) {
     cin >> T >> H >> W >> i0;
     h.resize(H - 1, vi(W));
     v.resize(H, vi(W - 1));
+    int wall_cnt = 0;
     rep(i, H - 1){
         rep(j, W){
             char x;
@@ -508,6 +508,7 @@ int main(int argc, char *argv[]) {
     }
 
     // solve
+    vi X, Y, plant_times, is_planted(K);
     X.resize(K), Y.resize(K), plant_times.resize(K, -1);
     mat<int> maze(H, vi(W, -1));
     dist = calc_dist(maze);
@@ -522,7 +523,18 @@ int main(int argc, char *argv[]) {
             }
         }
     }
-    greedy(0, init_crops, D, maze);
+    sort(all(init_crops), [&](int i, int j){
+        return D[i] > D[j];
+    });
+    maze = greedy(0, init_crops, maze);
+    rep(x, H)rep(y, W){
+        if(maze[x][y] != -1){
+            X[maze[x][y]] = x;
+            Y[maze[x][y]] = y;
+            plant_times[maze[x][y]] = 0;
+            is_planted[maze[x][y]] = 1;
+        }
+    }
 
     // その他の日
     rep(s, 1, T){
@@ -533,10 +545,22 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        greedy(s, crops, D, maze);
+        sort(all(crops), [&](int i, int j){
+            return D[i] > D[j];
+        });
+        maze = greedy(s, crops, maze);
+
+        rep(x, H)rep(y, W){
+            if(maze[x][y] != -1 && !is_planted[maze[x][y]]){
+                X[maze[x][y]] = x;
+                Y[maze[x][y]] = y;
+                plant_times[maze[x][y]] = s;
+                is_planted[maze[x][y]] = 1;
+            }
+        }
         
         rep(i, H)rep(j, W){
-            if(maze[i][j] == s)maze[i][j] = -1;
+            if(maze[i][j] != -1 && D[maze[i][j]] == s) maze[i][j] = -1;
         }
     }   
     
