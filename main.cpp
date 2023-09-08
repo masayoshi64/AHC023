@@ -465,6 +465,58 @@ mat<int> greedy(int s, vi& crops, mat<int> maze){
     return maze;
 }
 
+struct State{
+    vi crops;
+    double score, next_score;
+    int s, i, j;
+    mat<int> maze_;
+    State(int s, vi crops, mat<int> maze): crops(crops), s(s), maze_(maze) {
+        score = count(maze_);
+    }
+    double get_new_score(){
+        i = xor64(crops.size());
+        j = xor64(crops.size());
+        swap(crops[i], crops[j]);
+        next_score = count(maze_);
+        swap(crops[i], crops[j]);
+        return next_score;
+    }  
+    void step(){
+        swap(crops[i], crops[j]);
+        score = next_score;
+    }
+    int count(mat<int> maze){
+        int cnt = 0;
+        for(int k: crops){
+            vector<tuple<double, int, int>> score_xy;
+            for(auto [x, y]: get_valid_places(maze, D[k], s == 0)){
+                double score = calc_score(x, y, D[k], maze);
+                score_xy.emplace_back(score, x, y);
+            }
+            if(score_xy.empty()) continue;
+            auto [score, x, y] = *min_element(all(score_xy));
+            maze[x][y] = k;
+            cnt++;
+        }
+        return cnt;
+    }
+};
+
+State hill_climbing(State state){
+    Timer timer;
+    double max_time = 15;
+    while (timer.lap() < max_time) {
+        double score = state.score;
+        double new_score = state.get_new_score();
+        cerr << state.s << endl;
+        if (new_score > score) {
+            state.step();
+            cerr << score << " " << new_score << endl;
+        }
+    }
+    return state;
+}
+
 int main(int argc, char *argv[]) {
     cin.tie(0);
     ios::sync_with_stdio(0);
@@ -548,7 +600,11 @@ int main(int argc, char *argv[]) {
         sort(all(crops), [&](int i, int j){
             return D[i] > D[j];
         });
-        maze = greedy(s, crops, maze);
+        State state(s, crops, maze);
+        if(crops.size() > 1){
+            state = hill_climbing(state);
+        }
+        maze = greedy(s, state.crops, maze);
 
         rep(x, H)rep(y, W){
             if(maze[x][y] != -1 && !is_planted[maze[x][y]]){
