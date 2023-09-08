@@ -427,25 +427,26 @@ void set_dist(mat<int>& maze){
 }
 
 double calc_score(int s, int x, int y, int d, mat<int>& maze){
-    double score = -coef_dist * dist[x][y];
+    double score = coef_dist * dist[x][y];
     for(auto [dx, dy]: dxy){
         int nx = x + dx;
         int ny = y + dy;
         if(nx < 0 || nx >= H || ny < 0 || ny >= W || exists_wall(x, y, nx, ny)){
-            score += wall_penalty;
+            score -= wall_penalty;
             continue;
         }
-        if(maze[nx][ny] == -1) score += empty_penalty;
-        else{
-            score += abs(D[maze[nx][ny]] - d);
-            if(D[maze[nx][ny]] == d) score -= equal_bonus;
+        if(maze[nx][ny] == -1){
+            score -= empty_penalty;
+        }else{
+            score -= abs(D[maze[nx][ny]] - d);
+            if(D[maze[nx][ny]] == d) score += equal_bonus;
         }
     }
     for(auto [dx, dy]: dxy2){
         int nx = x + dx;
         int ny = y + dy;
         if(nx < 0 || nx >= H || ny < 0 || ny >= W || exists_wall(x, y, nx, ny)) continue;
-        if(maze[nx][ny] != -1 && D[maze[nx][ny]] == d) score -= equal_bonus;
+        if(maze[nx][ny] != -1 && D[maze[nx][ny]] == d) score += equal_bonus;
     }
     return score;
 }
@@ -455,28 +456,54 @@ struct State{
     int s;
     mat<int> maze;
     State(int s): s(s), maze(H, vi(W, -1)){}
-    vector<State> get_next_states(int k){
+    vector<State> get_next_states(int k, int limit){
         vector<State> next_states;
+        vector<tuple<int, int, int>> candidates;
         for(auto [x, y]: get_valid_places(maze, D[k], s == 0)){
+            int next_score = score + calc_score(s, x, y, D[k], maze) + D[k] * 100;
+            candidates.emplace_back(next_score, x, y);
+        }
+        sort(rall(candidates));
+        rep(i, min(limit, SZ(candidates))){
+            auto [next_score, x, y] = candidates[i];
             State next_state = *this;
-            next_state.score = score + calc_score(s, x, y, D[k], maze);
+            next_state.score = next_score;
             next_state.maze[x][y] = k;
-            next_states.emplace_back(next_state);
+            next_states.pb(next_state);
         }
         return next_states;
     }  
     bool operator<(const State &rhs) const {
-        return score > rhs.score;
+        return score < rhs.score;
     }
 };
 
 State greedy(State state, vi crops){
     for(int k: crops){
-        auto next_states = state.get_next_states(k);
+        auto next_states = state.get_next_states(k, 1);
         if(next_states.empty()) continue;
         state = *max_element(all(next_states));
     }
     return state;
+}
+
+State beam_search(State initial_state, vi crops, int beam_width){
+    vector<State> beam;
+    beam.push_back(initial_state);
+    for(int k:crops){
+        vector<State> next_beam;
+        int size = beam.size();
+        rep(i, min(beam_width, size)){
+            State state = beam[i];
+            vector<State> next_states = state.get_next_states(k, beam_width);
+            next_beam.insert(next_beam.end(), all(next_states));
+            next_beam.pb(state);
+        }
+        sort(rall(next_beam));
+        beam = next_beam;
+    }
+    State best_state = beam[0];
+    return best_state;
 }
 
 int main(int argc, char *argv[]) {
@@ -555,6 +582,7 @@ int main(int argc, char *argv[]) {
 
     // その他の日
     rep(s, 1, T){
+        set_dist(state.maze);
         vi crops;
         rep(j, K){
             if(S[j] == s && plant_times[j] == -1){
@@ -567,8 +595,9 @@ int main(int argc, char *argv[]) {
         });
 
         state.s++;
-        state = greedy(state, crops);
+        state = beam_search(state, crops, 5);
 
+        int cnt = 0;
         rep(x, H)rep(y, W){
             int k = state.maze[x][y];
             if(k != -1 && !is_planted[k]){
@@ -576,8 +605,10 @@ int main(int argc, char *argv[]) {
                 Y[k] = y;
                 plant_times[k] = s;
                 is_planted[k] = 1;
+                cnt++;
             }
         }
+        cerr << "day " << s << ": " << cnt << endl;
         
         rep(i, H)rep(j, W){
             if(state.maze[i][j] != -1 && D[state.maze[i][j]] == s) state.maze[i][j] = -1;
