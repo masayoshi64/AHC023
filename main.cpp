@@ -449,11 +449,10 @@ double calc_score(int x, int y, int d, mat<int>& maze){
     return score;
 }
 
-mat<int> greedy(int s, vi& crops, mat<int>& maze){
+void greedy(int s, vi& crops, vi& priority, mat<int>& maze){
     sort(all(crops), [&](int i, int j){
-        return D[i] > D[j];
+        return priority[i] > priority[j];
     });
-    mat<int> maze_k(H, vi(W, -1));
     for(int k: crops){
         vector<tuple<double, int, int>> score_xy;
         for(auto [x, y]: get_valid_places(maze, D[k], s == 0)){
@@ -463,76 +462,8 @@ mat<int> greedy(int s, vi& crops, mat<int>& maze){
         if(score_xy.empty()) continue;
         auto [score, x, y] = *min_element(all(score_xy));
         maze[x][y] = D[k];
-        maze_k[x][y] = k;
         X[k] = x, Y[k] = y, plant_times[k] = s;
     }
-    return maze_k;
-}
-
-bool check_maze(mat<int> &maze) {
-    mat<bool> used(H, vector<bool>(W, 0));
-    deque<pair<int, int>> que;
-    que.emplace_back(i0, 0);
-    used[i0][0] = true;
-    int cnt = 0;
-    while (!que.empty()) {
-        auto [x, y] = que.front();
-        que.pop_front();
-        cnt++;
-        for(auto [dx, dy] : dxy){
-            int nx = x + dx;
-            int ny = y + dy;
-            if(nx < 0 || nx >= H || ny < 0 || ny >= W || exists_wall(x, y, nx, ny)) continue;
-            if(used[nx][ny]) continue;
-            if(maze[nx][ny] < maze[x][y]) continue;
-            used[nx][ny] = true;
-            que.emplace_back(nx, ny);
-        }
-    }
-    return cnt == H * W;
-}
-
-struct State{
-    mat<int> maze, maze_k;
-    int x1, y1, x2, y2;
-    State(mat<int> maze, mat<int> maze_k): maze(maze), maze_k(maze_k){}
-    double get_new_score(){
-        while(true){
-            x1 = xor64(H), y1 = xor64(W);
-            auto [dx, dy] = dxy[xor64(4)];
-            x2 = x1 + dx, y2 = y1 + dy;
-            if(x2 < 0 || x2 >= H || y2 < 0 || y2 >= W || exists_wall(x1, y1, x2, y2) || maze[x1][y1] == maze[x2][y2]) continue;
-            swap(maze[x1][y1], maze[x2][y2]);
-            if(!check_maze(maze)){
-                swap(maze[x1][y1], maze[x2][y2]);
-                continue;
-            }
-            swap(maze[x1][y1], maze[x2][y2]);
-            break;
-        }
-        double diff = 0;
-        diff += calc_score(x1, y1, maze[x1][y1], maze) + calc_score(x2, y2, maze[x2][y2], maze);
-        swap(maze[x1][y1], maze[x2][y2]);
-        diff -= calc_score(x1, y1, maze[x1][y1], maze) + calc_score(x2, y2, maze[x2][y2], maze);
-        swap(maze[x1][y1], maze[x2][y2]);
-        return diff;
-    }  
-    void step(){
-        swap(maze_k[x1][y1], maze_k[x2][y2]);
-        swap(maze[x1][y1], maze[x2][y2]);
-    } // 実際の更新
-};
-
-State hill_climbing(State state){
-    Timer timer;
-    double max_time = 400;
-    while (timer.lap() < max_time) {
-        double diff = state.get_new_score();
-        if (diff >= 0) {
-            state.step();
-        }
-    }
-    return state;
 }
 
 int main(int argc, char *argv[]) {
@@ -591,16 +522,7 @@ int main(int argc, char *argv[]) {
             }
         }
     }
-    mat<int> maze_k = greedy(0, init_crops, maze);
-    // State state(maze, maze_k);
-    // state = hill_climbing(state);
-    // maze = state.maze;
-    // maze_k = state.maze_k;
-    rep(x, H)rep(y, W){
-        int k = maze_k[x][y];
-        if(k == -1) continue;
-        X[k] = x, Y[k] = y;
-    }
+    greedy(0, init_crops, D, maze);
 
     // その他の日
     rep(s, 1, T){
@@ -611,7 +533,7 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        greedy(s, crops, maze);
+        greedy(s, crops, D, maze);
         
         rep(i, H)rep(j, W){
             if(maze[i][j] == s)maze[i][j] = -1;
