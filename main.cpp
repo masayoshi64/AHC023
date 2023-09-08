@@ -331,27 +331,77 @@ bool exists_wall(int x, int y, int nx, int ny){
     return (_exists_wall(x, y, nx, y) || _exists_wall(nx, y, nx, ny)) && (_exists_wall(x, y, x, ny) || _exists_wall(x, ny, nx, ny));
 }
 
-bool check_maze(mat<int> &maze) {
-    mat<bool> used(H, vector<bool>(W, 0));
-    deque<pair<int, int>> que;
-    que.emplace_back(i0, 0);
-    used[i0][0] = true;
-    int cnt = 0;
-    while (!que.empty()) {
-        auto [x, y] = que.front();
-        que.pop_front();
-        cnt++;
-        for(auto [dx, dy] : dxy){
-            int nx = x + dx;
-            int ny = y + dy;
-            if(nx < 0 || nx >= H || ny < 0 || ny >= W || exists_wall(x, y, nx, ny)) continue;
-            if(used[nx][ny]) continue;
-            if(maze[nx][ny] < maze[x][y]) continue;
-            used[nx][ny] = true;
-            que.emplace_back(nx, ny);
+vector<pair<int, int>> get_valid_places(mat<int>& maze, int d, bool init = false){
+    set<pair<int, int>> aps;
+    vector<pair<int, int>> path;
+
+    Graph G(H * W);
+    rep(x, H)rep(y, W){
+        if(maze[x][y] == -1){
+            path.emplace_back(x, y);
+            for(auto [dx, dy] : dxy){
+                int nx = x + dx;
+                int ny = y + dy;
+                if(nx < 0 || nx >= H || ny < 0 || ny >= W || exists_wall(x, y, nx, ny) || maze[nx][ny] != -1) continue;
+                G[x * W + y].emplace_back(nx * W + ny);
+            }
         }
     }
-    return cnt == H * W;
+    LowLink lowlink_path(G);
+    for(int x: lowlink_path.aps){
+        aps.insert({x / W, x % W});
+    }
+
+    if(!init){
+        mat<pair<int, int>> d_to_places(T);
+        rep(x, H)rep(y, W){
+            if(maze[x][y] != -1) d_to_places[maze[x][y]].emplace_back(x, y);
+        }
+        mat<int> connected(H, vi(W, 0));
+        rep(s, d){
+            for(auto [x, y]: d_to_places[s]){
+                if(connected[x][y] == 1) continue;
+                deque<pair<int, int>> que;
+                que.emplace_back(x, y);
+                connected[x][y] = 1;
+                while(!que.empty()){
+                    auto [x, y] = que.front();
+                    que.pop_front();
+                    for(auto [dx, dy] : dxy){
+                        int nx = x + dx;
+                        int ny = y + dy;
+                        if(nx < 0 || nx >= H || ny < 0 || ny >= W || exists_wall(x, y, nx, ny)) continue;
+                        if(maze[nx][ny] == maze[x][y]){
+                            if(connected[nx][ny] == 1) continue;
+                            G[x * W + y].emplace_back(nx * W + ny);
+                            G[nx * W + ny].emplace_back(x * W + y);
+                            connected[nx][ny] = 1;
+                            que.emplace_back(nx, ny);
+                        }else if(maze[nx][ny] == -1){
+                            G[x * W + y].emplace_back(nx * W + ny);
+                            G[nx * W + ny].emplace_back(x * W + y);
+                        }else if(d > maze[nx][ny] && maze[nx][ny] > maze[x][y]){
+                            if(connected[nx][ny] == 1) continue;
+                            connected[nx][ny] = 1;
+                            que.emplace_back(nx, ny);
+                        }
+                    }
+                }
+            }
+        }
+        LowLink lowlink(G);
+        for(int x: lowlink.aps){
+            aps.insert({x / W, x % W});
+        }
+    }
+    
+    vector<pair<int, int>> valid_places;
+
+    for(auto [x, y]: path){
+        if(aps.count({x, y}) || (x == i0 && y == 0) || maze[x][y] != -1) continue;
+        valid_places.emplace_back(x, y);
+    }
+    return valid_places;
 }
 
 mat<int> calc_dist(mat<int>& maze){
@@ -405,85 +455,62 @@ mat<int> greedy(int s, vi& crops, mat<int>& maze){
     });
     mat<int> maze_k(H, vi(W, -1));
     for(int k: crops){
-        Graph G(H * W);
-        rep(x, H)rep(y, W){
-            if(maze[x][y] == -1){
-                for(auto [dx, dy] : dxy){
-                    int nx = x + dx;
-                    int ny = y + dy;
-                    if(nx < 0 || nx >= H || ny < 0 || ny >= W || exists_wall(x, y, nx, ny) || maze[nx][ny] != -1) continue;
-                    G[x * W + y].emplace_back(nx * W + ny);
-                }
-            }
-        }
-        LowLink lowlink(G);
-        set<pair<int, int>> aps;
-        for(int x: lowlink.aps){
-            aps.insert({x / W, x % W});
-        }
         vector<tuple<double, int, int>> score_xy;
-        rep(x, H)rep(y, W){
-            if(maze[x][y] != -1 || aps.count({x, y}) || (x == i0 && y == 0)) continue;
+        for(auto [x, y]: get_valid_places(maze, D[k], s == 0)){
             double score = calc_score(x, y, D[k], maze);
             score_xy.emplace_back(score, x, y);
         }
-        sort(all(score_xy));
-        for(auto [d, x, y]: score_xy){
-            maze[x][y] = D[k];
-            if(s == 0 || check_maze(maze)){
-                X[k] = x, Y[k] = y, plant_times[k] = s;
-                maze_k[x][y] = k;
-                break;
-            }else{
-                maze[x][y] = -1;
-            }
-        }
+        if(score_xy.empty()) continue;
+        auto [score, x, y] = *min_element(all(score_xy));
+        maze[x][y] = D[k];
+        maze_k[x][y] = k;
+        X[k] = x, Y[k] = y, plant_times[k] = s;
     }
     return maze_k;
 }
 
-struct State{
-    mat<int> maze, maze_k;
-    int x1, y1, x2, y2;
-    State(mat<int> maze, mat<int> maze_k): maze(maze), maze_k(maze_k){}
-    double get_new_score(){
-        while(true){
-            x1 = xor64(H), y1 = xor64(W);
-            auto [dx, dy] = dxy[xor64(4)];
-            x2 = x1 + dx, y2 = y1 + dy;
-            if(x2 < 0 || x2 >= H || y2 < 0 || y2 >= W || exists_wall(x1, y1, x2, y2) || maze[x1][y1] == maze[x2][y2]) continue;
-            swap(maze[x1][y1], maze[x2][y2]);
-            if(!check_maze(maze)){
-                swap(maze[x1][y1], maze[x2][y2]);
-                continue;
-            }
-            swap(maze[x1][y1], maze[x2][y2]);
-            break;
-        }
-        double diff = 0;
-        diff += calc_score(x1, y1, maze[x1][y1], maze) + calc_score(x2, y2, maze[x2][y2], maze);
-        swap(maze[x1][y1], maze[x2][y2]);
-        diff -= calc_score(x1, y1, maze[x1][y1], maze) + calc_score(x2, y2, maze[x2][y2], maze);
-        swap(maze[x1][y1], maze[x2][y2]);
-        return diff;
-    }  
-    void step(){
-        swap(maze_k[x1][y1], maze_k[x2][y2]);
-        swap(maze[x1][y1], maze[x2][y2]);
-    } // 実際の更新
-};
+// struct State{
+//     mat<int> maze, maze_k;
+//     int x1, y1, x2, y2;
+//     State(mat<int> maze, mat<int> maze_k): maze(maze), maze_k(maze_k){}
+//     double get_new_score(){
+//         while(true){
+//             x1 = xor64(H), y1 = xor64(W);
+//             auto [dx, dy] = dxy[xor64(4)];
+//             x2 = x1 + dx, y2 = y1 + dy;
+//             if(x2 < 0 || x2 >= H || y2 < 0 || y2 >= W || exists_wall(x1, y1, x2, y2) || maze[x1][y1] == maze[x2][y2]) continue;
+//             swap(maze[x1][y1], maze[x2][y2]);
+//             if(!check_maze(maze)){
+//                 swap(maze[x1][y1], maze[x2][y2]);
+//                 continue;
+//             }
+//             swap(maze[x1][y1], maze[x2][y2]);
+//             break;
+//         }
+//         double diff = 0;
+//         diff += calc_score(x1, y1, maze[x1][y1], maze) + calc_score(x2, y2, maze[x2][y2], maze);
+//         swap(maze[x1][y1], maze[x2][y2]);
+//         diff -= calc_score(x1, y1, maze[x1][y1], maze) + calc_score(x2, y2, maze[x2][y2], maze);
+//         swap(maze[x1][y1], maze[x2][y2]);
+//         return diff;
+//     }  
+//     void step(){
+//         swap(maze_k[x1][y1], maze_k[x2][y2]);
+//         swap(maze[x1][y1], maze[x2][y2]);
+//     } // 実際の更新
+// };
 
-State hill_climbing(State state){
-    Timer timer;
-    double max_time = 0;
-    while (timer.lap() < max_time) {
-        double diff = state.get_new_score();
-        if (diff > 0) {
-            state.step();
-        }
-    }
-    return state;
-}
+// State hill_climbing(State state){
+//     Timer timer;
+//     double max_time = 0;
+//     while (timer.lap() < max_time) {
+//         double diff = state.get_new_score();
+//         if (diff > 0) {
+//             state.step();
+//         }
+//     }
+//     return state;
+// }
 
 int main(int argc, char *argv[]) {
     cin.tie(0);
@@ -542,10 +569,10 @@ int main(int argc, char *argv[]) {
         }
     }
     mat<int> maze_k = greedy(0, init_crops, maze);
-    State state(maze, maze_k);
-    state = hill_climbing(state);
-    maze = state.maze;
-    maze_k = state.maze_k;
+    // State state(maze, maze_k);
+    // state = hill_climbing(state);
+    // maze = state.maze;
+    // maze_k = state.maze_k;
     rep(x, H)rep(y, W){
         int k = maze_k[x][y];
         if(k == -1) continue;
