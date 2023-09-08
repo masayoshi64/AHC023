@@ -359,11 +359,11 @@ vector<pair<int, int>> get_valid_places(mat<int>& maze, int d, bool init = false
         }
         mat<int> connected(H, vi(W, 0));
         rep(s, d){
-            for(auto [x, y]: d_to_places[s]){
-                if(connected[x][y] == 1) continue;
+            for(auto [x0, y0]: d_to_places[s]){
+                if(connected[x0][y0] == 1) continue;
                 deque<pair<int, int>> que;
-                que.emplace_back(x, y);
-                connected[x][y] = 1;
+                que.emplace_back(x0, y0);
+                connected[x0][y0] = 1;
                 while(!que.empty()){
                     auto [x, y] = que.front();
                     que.pop_front();
@@ -404,8 +404,8 @@ vector<pair<int, int>> get_valid_places(mat<int>& maze, int d, bool init = false
     return valid_places;
 }
 
-mat<int> calc_dist(mat<int>& maze){
-    mat<int> dist(H, vi(W, inf));
+void set_dist(mat<int>& maze){
+    dist.assign(H, vi(W, inf));
     deque<pair<int, int>> que;
     if(maze[i0][0] == -1){
         dist[i0][0] = 0;
@@ -424,7 +424,6 @@ mat<int> calc_dist(mat<int>& maze){
             que.emplace_back(nx, ny);
         }
     }
-    return dist;
 }
 
 double calc_score(int s, int x, int y, int d, mat<int>& maze){
@@ -451,18 +450,33 @@ double calc_score(int s, int x, int y, int d, mat<int>& maze){
     return score;
 }
 
-mat<int> greedy(int s, vi& crops, mat<int> maze){
-    for(int k: crops){
-        vector<tuple<double, int, int>> score_xy;
+struct State{
+    double score;
+    int s;
+    mat<int> maze;
+    State(int s): s(s), maze(H, vi(W, -1)){}
+    vector<State> get_next_states(int k){
+        vector<State> next_states;
         for(auto [x, y]: get_valid_places(maze, D[k], s == 0)){
-            double score = calc_score(s, x, y, D[k], maze);
-            score_xy.emplace_back(score, x, y);
+            State next_state = *this;
+            next_state.score = score + calc_score(s, x, y, D[k], maze);
+            next_state.maze[x][y] = k;
+            next_states.emplace_back(next_state);
         }
-        if(score_xy.empty()) continue;
-        auto [score, x, y] = *min_element(all(score_xy));
-        maze[x][y] = k;
+        return next_states;
+    }  
+    bool operator<(const State &rhs) const {
+        return score > rhs.score;
     }
-    return maze;
+};
+
+State greedy(State state, vi crops){
+    for(int k: crops){
+        auto next_states = state.get_next_states(k);
+        if(next_states.empty()) continue;
+        state = *max_element(all(next_states));
+    }
+    return state;
 }
 
 int main(int argc, char *argv[]) {
@@ -510,8 +524,8 @@ int main(int argc, char *argv[]) {
     // solve
     vi X, Y, plant_times, is_planted(K);
     X.resize(K), Y.resize(K), plant_times.resize(K, -1);
-    mat<int> maze(H, vi(W, -1));
-    dist = calc_dist(maze);
+    State state(0);
+    set_dist(state.maze);
     
     // 初期配置
     vi init_crops;
@@ -526,13 +540,16 @@ int main(int argc, char *argv[]) {
     sort(all(init_crops), [&](int i, int j){
         return D[i] > D[j];
     });
-    maze = greedy(0, init_crops, maze);
+
+    state = greedy(state, init_crops);
+
     rep(x, H)rep(y, W){
-        if(maze[x][y] != -1){
-            X[maze[x][y]] = x;
-            Y[maze[x][y]] = y;
-            plant_times[maze[x][y]] = 0;
-            is_planted[maze[x][y]] = 1;
+        int k = state.maze[x][y];
+        if(k != -1){
+            X[k] = x;
+            Y[k] = y;
+            plant_times[k] = 0;
+            is_planted[k] = 1;
         }
     }
 
@@ -549,19 +566,21 @@ int main(int argc, char *argv[]) {
             return D[i] > D[j];
         });
 
-        maze = greedy(s, crops, maze);
+        state.s++;
+        state = greedy(state, crops);
 
         rep(x, H)rep(y, W){
-            if(maze[x][y] != -1 && !is_planted[maze[x][y]]){
-                X[maze[x][y]] = x;
-                Y[maze[x][y]] = y;
-                plant_times[maze[x][y]] = s;
-                is_planted[maze[x][y]] = 1;
+            int k = state.maze[x][y];
+            if(k != -1 && !is_planted[k]){
+                X[k] = x;
+                Y[k] = y;
+                plant_times[k] = s;
+                is_planted[k] = 1;
             }
         }
         
         rep(i, H)rep(j, W){
-            if(maze[i][j] != -1 && D[maze[i][j]] == s) maze[i][j] = -1;
+            if(state.maze[i][j] != -1 && D[state.maze[i][j]] == s) state.maze[i][j] = -1;
         }
     }   
     
