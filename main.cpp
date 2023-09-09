@@ -455,7 +455,8 @@ struct State{
     double score;
     int s;
     mat<int> maze;
-    State(int s): s(s), maze(H, vi(W, -1)){}
+    vi X, Y, plant_times;
+    State(int s): s(s), maze(H, vi(W, -1)), X(K), Y(K), plant_times(K, -1){}
     vector<State> get_next_states(int k, int limit){
         vector<State> next_states;
         vector<tuple<int, int, int>> candidates;
@@ -469,6 +470,9 @@ struct State{
             State next_state = *this;
             next_state.score = next_score;
             next_state.maze[x][y] = k;
+            next_state.X[k] = x;
+            next_state.Y[k] = y;
+            next_state.plant_times[k] = s;
             next_states.pb(next_state);
         }
         return next_states;
@@ -549,8 +553,6 @@ int main(int argc, char *argv[]) {
     }
 
     // solve
-    vi X, Y, plant_times, is_planted(K);
-    X.resize(K), Y.resize(K), plant_times.resize(K, -1);
     State state(0);
     set_dist(state.maze);
     
@@ -570,22 +572,12 @@ int main(int argc, char *argv[]) {
 
     state = greedy(state, init_crops);
 
-    rep(x, H)rep(y, W){
-        int k = state.maze[x][y];
-        if(k != -1){
-            X[k] = x;
-            Y[k] = y;
-            plant_times[k] = 0;
-            is_planted[k] = 1;
-        }
-    }
-
     // その他の日
     rep(s, 1, T){
         set_dist(state.maze);
         vi crops;
         rep(j, K){
-            if(S[j] == s && plant_times[j] == -1){
+            if(S[j] == s && state.plant_times[j] == -1){
                 crops.pb(j);
             }
         }
@@ -596,19 +588,6 @@ int main(int argc, char *argv[]) {
 
         state.s++;
         state = beam_search(state, crops, 5);
-
-        int cnt = 0;
-        rep(x, H)rep(y, W){
-            int k = state.maze[x][y];
-            if(k != -1 && !is_planted[k]){
-                X[k] = x;
-                Y[k] = y;
-                plant_times[k] = s;
-                is_planted[k] = 1;
-                cnt++;
-            }
-        }
-        cerr << "day " << s << ": " << cnt << endl;
         
         rep(i, H)rep(j, W){
             if(state.maze[i][j] != -1 && D[state.maze[i][j]] == s) state.maze[i][j] = -1;
@@ -621,8 +600,8 @@ int main(int argc, char *argv[]) {
     vi plant_cnt(T), all_cnt(T);
     rep(k, K){
         all_cnt[S[k]]++;
-        if(plant_times[k] != -1){
-            ans.emplace_back(k, X[k], Y[k], plant_times[k]);
+        if(state.plant_times[k] != -1){
+            ans.emplace_back(k, state.X[k], state.Y[k], state.plant_times[k]);
             plant_cnt[S[k]]++;
         }
     }
