@@ -458,17 +458,17 @@ struct State{
     vi X, Y, plant_times;
     State(int s): s(s), maze(H, vi(W, -1)), X(K), Y(K), plant_times(K, -1){}
     vector<State> get_next_states(int k, int limit){
-        vector<State> next_states;
-        vector<tuple<int, int, int>> candidates;
+        vector<tuple<double, int, int>> candidates;
         for(auto [x, y]: get_valid_places(maze, D[k], s == 0)){
-            int next_score = score + calc_score(s, x, y, D[k], maze) + D[k] * 100;
-            candidates.emplace_back(next_score, x, y);
+            double priority = calc_score(s, x, y, D[k], maze);
+            candidates.emplace_back(priority, x, y);
         }
         sort(rall(candidates));
+        vector<State> next_states;
         rep(i, min(limit, SZ(candidates))){
-            auto [next_score, x, y] = candidates[i];
+            auto [p, x, y] = candidates[i];
             State next_state = *this;
-            next_state.score = next_score;
+            next_state.score = score + D[k];
             next_state.maze[x][y] = k;
             next_state.X[k] = x;
             next_state.Y[k] = y;
@@ -482,11 +482,26 @@ struct State{
     }
 };
 
-State greedy(State state, vi crops){
+State init_greedy(State state, vi crops){
     for(int k: crops){
         auto next_states = state.get_next_states(k, 1);
         if(next_states.empty()) continue;
-        state = *max_element(all(next_states));
+        state = next_states[0];
+    }
+    return state;
+}
+
+State greedy(State state, vi crops){
+    for(int k: crops){
+        if(state.s < S[k]){
+            rep(i, H)rep(j, W){
+                if(state.maze[i][j] != -1 && D[state.maze[i][j]] < S[k]) state.maze[i][j] = -1;
+            }
+        }
+        state.s = S[k];
+        auto next_states = state.get_next_states(k, 1);
+        if(next_states.empty()) continue;
+        state = next_states[0];
     }
     return state;
 }
@@ -499,6 +514,12 @@ State beam_search(State initial_state, vi crops, int beam_width){
         int size = beam.size();
         rep(i, min(beam_width, size)){
             State state = beam[i];
+            if(state.s < S[k]){
+                rep(i, H)rep(j, W){
+                    if(state.maze[i][j] != -1 && D[state.maze[i][j]] < S[k]) state.maze[i][j] = -1;
+                }
+            }
+            state.s = S[k];
             vector<State> next_states = state.get_next_states(k, beam_width);
             next_beam.insert(next_beam.end(), all(next_states));
             next_beam.pb(state);
@@ -570,29 +591,18 @@ int main(int argc, char *argv[]) {
         return D[i] > D[j];
     });
 
-    state = greedy(state, init_crops);
+    state = init_greedy(state, init_crops);
 
     // その他の日
-    rep(s, 1, T){
-        set_dist(state.maze);
-        vi crops;
-        rep(j, K){
-            if(S[j] == s && state.plant_times[j] == -1){
-                crops.pb(j);
-            }
-        }
-
-        sort(all(crops), [&](int i, int j){
-            return D[i] > D[j];
-        });
-
-        state.s++;
-        state = beam_search(state, crops, 5);
-        
-        rep(i, H)rep(j, W){
-            if(state.maze[i][j] != -1 && D[state.maze[i][j]] == s) state.maze[i][j] = -1;
-        }
-    }   
+    vi crops;
+    rep(i, K){
+        if(state.plant_times[i] != -1) continue;
+        crops.pb(i);
+    }
+    sort(all(crops), [&](int i, int j){
+        return mp(S[j], D[i]) > mp(S[i], D[j]);
+    });
+    state = beam_search(state, crops, 5); 
     
     // output
     double score = 0;
